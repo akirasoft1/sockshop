@@ -1,0 +1,15 @@
+apiVersion: dynatrace.com/v1alpha1
+kind: OneAgent
+metadata:
+  name: oneagent
+  namespace: dynatrace
+spec:
+  apiUrl: https://uap09929.sprint.dynatracelabs.com/api
+  skipCertCheck: false
+  tokens: ""
+  nodeSelector: {}
+  tolerations: []
+  image: ""
+  args:
+  - APP_LOG_CONTENT_ACCESS=1
+  env: []

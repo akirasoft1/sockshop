@@ -1,2 +1,2 @@
 # Credentials
-./deploy/cloud-foundry/ci/credentials.yml
+deploy/cloud-foundry/ci/credentials.yml

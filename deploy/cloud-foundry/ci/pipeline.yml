@@ -1,0 +1,609 @@
+---
+groups:
+- name: front-end-jobs
+  jobs:
+  - build-front-end
+  - deploy-to-development
+  - execute-functional-tests
+  - deploy-to-loadtest
+  - execute-load-tests
+  - deploy-to-production
+  - execute-load-like-production
+
+- name: user-jobs
+  jobs:
+  - build-user
+  - deploy-user-to-development
+
+- name: catalogue-jobs
+  jobs:
+  - build-catalogue
+  - deploy-catalogue-to-development
+
+- name: carts-jobs
+  jobs:
+  - build-carts
+  - deploy-carts-to-development
+
+- name: orders-jobs
+  jobs:
+  - build-orders
+  - deploy-orders-to-development
+
+- name: payment-jobs
+  jobs:
+  - build-payment
+  - deploy-payment-to-development
+
+- name: shipping-jobs
+  jobs:
+  - build-shipping
+  - deploy-shipping-to-development
+
+- name: queue-master-jobs
+  jobs:
+  - build-queue-master
+  - deploy-queue-master-to-development
+
+
+resources:
+
+# GitHub Repositories
+
+- name: git-front-end
+  type: git
+  source:
+    branch: master
+    uri: https://github.com/dynatrace-sockshop/front-end.git
+
+- name: git-user
+  type: git
+  source:
+    branch: master
+    uri: https://github.com/dynatrace-sockshop/user.git
+
+- name: git-payment
+  type: git
+  source:
+    branch: master
+    uri: https://github.com/dynatrace-sockshop/payment.git
+
+- name: git-catalogue
+  type: git
+  source:
+    branch: master
+    uri: https://github.com/dynatrace-sockshop/catalogue.git
+
+- name: git-carts
+  type: git
+  source:
+    branch: master
+    uri: https://github.com/dynatrace-sockshop/carts.git
+
+- name: git-orders
+  type: git
+  source:
+    branch: master
+    uri: https://github.com/dynatrace-sockshop/orders.git
+
+- name: git-shipping
+  type: git
+  source:
+    branch: master
+    uri: https://github.com/dynatrace-sockshop/shipping.git
+
+- name: git-queue-master
+  type: git
+  source:
+    branch: master
+    uri: https://github.com/dynatrace-sockshop/queue-master.git
+
+# Docker Images
+
+- name: front-end-image
+  type: docker-image
+  source:
+    repository: jbraeuer/front-end
+    email: ((docker-hub-email))
+    username: ((docker-hub-username))
+    password: ((docker-hub-password))
+
+- name: payment-image
+  type: docker-image
+  source:
+    repository: jbraeuer/payment
+    email: ((docker-hub-email))
+    username: ((docker-hub-username))
+    password: ((docker-hub-password))
+
+- name: catalogue-image
+  type: docker-image
+  source:
+    repository: jbraeuer/catalogue
+    email: ((docker-hub-email))
+    username: ((docker-hub-username))
+    password: ((docker-hub-password))
+
+- name: user-image
+  type: docker-image
+  source:
+    repository: jbraeuer/user
+    email: ((docker-hub-email))
+    username: ((docker-hub-username))
+    password: ((docker-hub-password))
+
+- name: carts-image
+  type: docker-image
+  source:
+    repository: jbraeuer/user
+    email: ((docker-hub-email))
+    username: ((docker-hub-username))
+    password: ((docker-hub-password))
+
+- name: orders-image
+  type: docker-image
+  source:
+    repository: jbraeuer/orders
+    email: ((docker-hub-email))
+    username: ((docker-hub-username))
+    password: ((docker-hub-password))
+
+- name: shipping-image
+  type: docker-image
+  source:
+    repository: jbraeuer/shipping
+    email: ((docker-hub-email))
+    username: ((docker-hub-username))
+    password: X((docker-hub-password))
+
+- name: queue-master-image
+  type: docker-image
+  source:
+    repository: jbraeuer/payment
+    email: ((docker-hub-email))
+    username: ((docker-hub-username))
+    password: ((docker-hub-password))
+
+# PCF Environments
+
+- name: pcf-development
+  type: cf
+  source:
+    api: ((pcf-api))
+    username: ((pcf-username))
+    password: ((pcf-password))
+    organization: ((pcf-organization))
+    space: production
+    skip_cert_check: false
+
+- name: pcf-loadtest
+  type: cf
+  source:
+    api: ((pcf-api))
+    username: ((pcf-username))
+    password: ((pcf-password))
+    organization: ((pcf-organization))
+    space: production
+    skip_cert_check: false
+
+- name: pcf-production
+  type: cf
+  source:
+    api: ((pcf-api))
+    username: ((pcf-username))
+    password: ((pcf-password))
+    organization: ((pcf-organization))
+    space: production
+    skip_cert_check: false
+
+jobs:
+
+# FRONT-END
+
+- name: build-front-end
+  serial: true
+  public: true
+  plan:
+  - get: git-front-end
+    trigger: false
+  - put: front-end-image
+    params:
+      build: git-front-end
+      cache_tag: latest
+
+- name: deploy-to-development
+  serial: true
+  public: true
+  plan:
+  - get: git-front-end
+    trigger: true
+    passed:
+      - build-front-end
+  - put: pcf-development
+    params:
+      manifest: git-front-end/manifest.yml
+
+- name: execute-functional-tests
+  serial: true
+  public: true
+  plan:
+  - aggregate:
+    - get: git-front-end
+      trigger: true
+      passed:
+        - deploy-to-development
+  - task: run-functional-tests
+    config:
+      platform: linux
+      image_resource:
+        type: docker-image
+        source: {repository: busybox}
+      run:
+        path: echo
+        args: [hello world]
+
+- name: deploy-to-loadtest
+  serial: true
+  public: true
+  plan:
+  - aggregate:
+    - get: git-front-end
+      trigger: true
+      passed:
+        - execute-functional-tests
+  - put: pcf-loadtest
+    params:
+      manifest: git-front-end/manifest.yml 
+
+- name: execute-load-tests
+  serial: true
+  public: true
+  plan:
+  - aggregate:
+    - get: git-front-end
+      trigger: true
+      passed:
+        - deploy-to-loadtest
+  - task: run-functional-tests
+    config:
+      platform: linux
+      image_resource:
+        type: docker-image
+        source: {repository: busybox}
+      run:
+        path: echo
+        args: [hello world]
+
+- name: deploy-to-production
+  serial: true
+  public: true
+  plan:
+  - aggregate:
+    - get: git-front-end
+      trigger: true
+      passed:
+        - execute-load-tests
+  - put: pcf-production
+    params:
+      manifest: git-front-end/manifest.yml 
+
+- name: execute-load-like-production
+  serial: true
+  public: true
+  plan:
+  - aggregate:
+    - get: git-front-end
+      trigger: true
+      passed:
+        - deploy-to-production
+  - task: run-functional-tests
+    config:
+      platform: linux
+      image_resource:
+        type: docker-image
+        source: {repository: busybox}
+      run:
+        path: echo
+        args: [hello world]
+
+# USER
+
+- name: build-user
+  plan:
+  - get: git-user
+    trigger: false
+  - task: copy-dockerfile
+    config:
+      platform: linux
+      image_resource:
+        type: docker-image
+        source: {repository: busybox}
+      inputs:
+      - name: git-user
+      outputs:
+      - name: workspace
+      run:
+        path: /bin/sh
+        args:
+        - -exc
+        - |
+          output_dir=workspace
+          rm git-user/Dockerfile
+          cp git-user/docker/user/Dockerfile git-user/
+          cp -R git-user/. "${output_dir}/"
+  - put: user-image
+    params:
+      build: workspace
+      cache_tag: latest
+
+- name: deploy-user-to-development
+  serial: true
+  public: true
+  plan:
+  - get: git-user
+    trigger: true
+    passed:
+      - build-user
+  - put: pcf-production
+    params:
+      manifest: git-user/manifest.yml
+
+# CATALOGUE
+
+- name: build-catalogue
+  plan:
+  - get: git-catalogue
+    trigger: false
+  - task: run-build-script
+    config:
+      platform: linux
+      image_resource:
+        type: docker-image
+        source: {repository: busybox}
+      inputs:
+      - name: git-catalogue
+      outputs:
+      - name: workspace
+      run:
+        path: /bin/sh
+        args:
+        - -exc
+        - |
+          output_dir=workspace
+          cp git-catalogue/docker/catalogue/Dockerfile "${output_dir}/Dockerfile"
+          sh git-catalogue/scripts/build.jb.sh
+          cp -R git-catalogue/build/docker/catalogue/ "${output_dir}/"
+  - put: catalogue-image
+    params:
+      build: workspace
+      cache_tag: latest
+
+- name: deploy-catalogue-to-development
+  serial: true
+  public: true
+  plan:
+  - get: git-catalogue
+    trigger: true
+    passed:
+      - build-catalogue  
+  - put: pcf-production
+    params:
+      manifest: git-catalogue/manifest.yml
+
+# CARTS
+
+- name: build-carts
+  plan:
+  - get: git-carts
+    trigger: false
+  - task: mvn-build
+    config:
+      platform: linux
+      image_resource:
+        type: docker-image
+        source: {repository: maven, tag: 3.2-jdk-8}
+      inputs:
+      - name: git-carts
+      outputs:
+      - name: workspace
+      run:
+        path: /bin/sh
+        args:
+        - -exc
+        - |
+          output_dir=workspace
+          cd git-carts
+          mvn -DskipTests package
+          cd ..
+          cp git-carts/target/*.jar git-carts/docker/carts
+          cp -R git-carts/docker/carts/. "${output_dir}/"
+  - put: carts-image
+    params:
+      build: workspace
+      cache_tag: latest
+
+- name: deploy-carts-to-development
+  serial: true
+  public: true
+  plan:
+  - get: git-carts
+    trigger: true
+    passed:
+      - build-carts  
+  - put: pcf-production
+    params:
+      manifest: git-carts/manifest.yml
+
+## ORDERS
+
+- name: build-orders
+  plan:
+  - get: git-orders
+    trigger: false
+  - task: mvn-build
+    config:
+      platform: linux
+      image_resource:
+        type: docker-image
+        source: {repository: maven, tag: 3.2-jdk-8}
+      inputs:
+      - name: git-orders
+      outputs:
+      - name: workspace
+      run:
+        path: /bin/sh
+        args:
+        - -exc
+        - |
+          output_dir=workspace
+          cd git-orders
+          mvn -DskipTests package
+          cd ..
+          cp git-orders/target/*.jar git-orders/docker/orders
+          cp -R git-orders/docker/orders/. "${output_dir}/"
+  - put: orders-image
+    params:
+      build: workspace
+      cache_tag: latest
+
+- name: deploy-orders-to-development
+  serial: true
+  public: true
+  plan:
+  - get: git-orders
+    trigger: true
+    passed:
+      - build-orders  
+  - put: pcf-production
+    params:
+      manifest: git-orders/manifest.yml
+
+## PAYMNET
+
+- name: build-payment
+  plan:
+  - get: git-payment
+    trigger: false
+  - task: run-build-script
+    config:
+      platform: linux
+      image_resource:
+        type: docker-image
+        source: {repository: busybox}
+      inputs:
+      - name: git-payment
+      outputs:
+      - name: workspace
+      run:
+        path: /bin/sh
+        args:
+        - -exc
+        - |
+          output_dir=workspace
+          cp git-payment/docker/payment/Dockerfile "${output_dir}/Dockerfile"
+          sh git-payment/scripts/build.jb.sh
+          cp -R git-payment/docker/payment/ "${output_dir}/"
+  - put: payment-image
+    params:
+      build: workspace
+      cache_tag: latest
+
+- name: deploy-payment-to-development
+  serial: true
+  public: true
+  plan:
+  - get: git-payment
+    trigger: true
+    passed:
+      - build-payment  
+  - put: pcf-production
+    params:
+      manifest: git-payment/manifest-docker.yml
+
+## SHIPPING
+
+- name: build-shipping
+  plan:
+  - get: git-shipping
+    trigger: false
+  - task: mvn-build
+    config:
+      platform: linux
+      image_resource:
+        type: docker-image
+        source: {repository: maven, tag: 3.2-jdk-8}
+      inputs:
+      - name: git-shipping
+      outputs:
+      - name: workspace
+      run:
+        path: /bin/sh
+        args:
+        - -exc
+        - |
+          output_dir=workspace
+          cd git-shipping
+          mvn -DskipTests package
+          cd ..
+          cp git-shipping/target/*.jar git-shipping/docker/shipping
+          cp -R git-shipping/docker/shipping/. "${output_dir}/"
+  - put: shipping-image
+    params:
+      build: workspace
+      cache_tag: latest
+
+- name: deploy-shipping-to-development
+  serial: true
+  public: true
+  plan:
+  - get: git-shipping
+    trigger: true
+    passed:
+      - build-shipping  
+  - put: pcf-production
+    params:
+      manifest: git-shipping/manifest.yml
+
+## QUEUE-MASTER
+
+- name: build-queue-master
+  plan:
+  - get: git-queue-master
+    trigger: false
+  - task: mvn-build
+    config:
+      platform: linux
+      image_resource:
+        type: docker-image
+        source: {repository: maven, tag: 3.2-jdk-8}
+      inputs:
+      - name: git-queue-master
+      outputs:
+      - name: workspace
+      run:
+        path: /bin/sh
+        args:
+        - -exc
+        - |
+          output_dir=workspace
+          cd git-queue-master
+          mvn -DskipTests package
+          cd ..
+          cp git-queue-master/target/*.jar git-queue-master/docker/queue-master
+          cp -R git-queue-master/docker/queue-master/. "${output_dir}/"
+  - put: queue-master-image
+    params:
+      build: workspace
+      cache_tag: latest
+
+- name: deploy-queue-master-to-development
+  serial: true
+  public: true
+  plan:
+  - get: git-queue-master
+    trigger: true
+    passed:
+      - build-queue-master  
+  - put: pcf-production
+    params:
+      manifest: git-queue-master/manifest.yml

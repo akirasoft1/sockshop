@@ -55,7 +55,7 @@ Export KUBECONFIG:
 
 ```
 export KUBECONFIG=~/.kube/config
-
+```
 
 Verify if connection works:
 

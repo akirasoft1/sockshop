@@ -63,9 +63,29 @@ Verify if connection works:
 $ kubectl get svc
 NAME         TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
 kubernetes   ClusterIP   172.20.0.1   <none>        443/TCP   7m
+```
 
 <br>
 
 ### Step 3: Connect nodes to cluster
 
 __Connect the nodes to the cluster__ using the terraform output (__config_map_aws_auth__).
+
+```
+cat <<EOF | kubectl apply -f -
+> apiVersion: v1
+> kind: ConfigMap
+> metadata:
+>   name: aws-auth
+>   namespace: kube-system
+> data:
+>   mapRoles: |
+>     - rolearn: arn:aws:iam::1234567890:role/terraform-eks-acm-node
+>       username: system:node:{{EC2PrivateDNSName}}
+>       groups:
+>         - system:bootstrappers
+>         - system:nodes
+> EOF
+configmap "aws-auth" created
+```
+

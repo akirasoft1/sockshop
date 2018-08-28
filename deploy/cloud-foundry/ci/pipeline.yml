@@ -3,6 +3,7 @@ groups:
 - name: front-end-jobs
   jobs:
   - build-front-end
+  - build-front-end-test-image
   - deploy-to-development
   - execute-functional-tests
   - deploy-to-loadtest
@@ -104,6 +105,14 @@ resources:
   type: docker-image
   source:
     repository: jbraeuer/front-end
+    email: ((docker-hub-email))
+    username: ((docker-hub-username))
+    password: ((docker-hub-password))
+
+- name: front-end-test-image
+  type: docker-image
+  source:
+    repository: jbraeuer/front-end-test
     email: ((docker-hub-email))
     username: ((docker-hub-username))
     password: ((docker-hub-password))
@@ -211,6 +220,36 @@ jobs:
       build: git-front-end
       cache_tag: latest
 
+- name: build-front-end-test-image
+  serial: true
+  public: true
+  plan:
+  - get: git-front-end
+    trigger: false
+  - task: exchange-dockerfile
+    config:
+      platform: linux
+      image_resource:
+        type: docker-image
+        source: {repository: busybox}
+      inputs:
+      - name: git-front-end
+      outputs:
+      - name: workspace
+      run:
+        path: /bin/sh
+        args:
+        - -exc
+        - |
+          output_dir=workspace
+          rm git-front-end/Dockerfile
+          cp git-front-end/test/Dockerfile git-front-end/
+          cp -R git-front-end/. "${output_dir}/"
+  - put: front-end-test-image
+    params:
+      build: workspace
+      cache_tag: latest
+
 - name: deploy-to-development
   serial: true
   public: true
@@ -232,15 +271,23 @@ jobs:
       trigger: true
       passed:
         - deploy-to-development
+    - get: front-end-test-image
+      passed:
+        - build-front-end-test-image
   - task: run-functional-tests
+    image: front-end-test-image
     config:
       platform: linux
-      image_resource:
-        type: docker-image
-        source: {repository: busybox}
+      inputs:
+      - name: git-front-end
       run:
-        path: echo
-        args: [hello world]
+        dir: git-front-end
+        path: /bin/sh
+        args:
+        - -exc
+        - |
+          yarn install
+          npm test
 
 - name: deploy-to-loadtest
   serial: true
@@ -261,18 +308,26 @@ jobs:
   plan:
   - aggregate:
     - get: git-front-end
-      trigger: true
-      passed:
-        - deploy-to-loadtest
-  - task: run-functional-tests
+      #trigger: true
+      #passed:
+      #  - deploy-to-loadtest
+    - get: front-end-test-image
+      #passed:
+      #  - build-front-end-test-image
+  - task: run-load-tests
+    image: front-end-test-image
     config:
       platform: linux
-      image_resource:
-        type: docker-image
-        source: {repository: busybox}
+      inputs:
+      - name: git-front-end
       run:
-        path: echo
-        args: [hello world]
+        dir: git-front-end
+        path: /bin/bash
+        args:
+        - -exc
+        - |
+          yarn install
+          bash test/e2e/runner.sh
 
 - name: deploy-to-production
   serial: true

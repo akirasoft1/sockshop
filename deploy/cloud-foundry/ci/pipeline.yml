@@ -4,17 +4,19 @@ groups:
   jobs:
   - build-front-end
   - build-front-end-test-image
-  - deploy-to-development
-  - execute-functional-tests
-  - deploy-to-loadtest
-  - execute-load-tests
-  - deploy-to-production
+  - deploy-front-end-to-development
+  - execute-front-end-functional-tests
+  - deploy-front-end-to-loadtest
+  - execute-front-end-load-tests
+  - deploy-front-end-to-production
   - execute-load-like-production
 
 - name: user-jobs
   jobs:
   - build-user
+  - build-user-test-image
   - deploy-user-to-development
+  - execute-user-functional-tests
 
 - name: catalogue-jobs
   jobs:
@@ -141,6 +143,14 @@ resources:
     username: ((docker-hub-username))
     password: ((docker-hub-password))
 
+- name: user-test-image
+  type: docker-image
+  source:
+    repository: jbraeuer/user-test
+    email: ((docker-hub-email))
+    username: ((docker-hub-username))
+    password: ((docker-hub-password))
+
 - name: carts-image
   type: docker-image
   source:
@@ -250,7 +260,7 @@ jobs:
       build: workspace
       cache_tag: latest
 
-- name: deploy-to-development
+- name: deploy-front-end-to-development
   serial: true
   public: true
   plan:
@@ -262,7 +272,7 @@ jobs:
     params:
       manifest: git-front-end/manifest.yml
 
-- name: execute-functional-tests
+- name: execute-front-end-functional-tests
   serial: true
   public: true
   plan:
@@ -270,7 +280,7 @@ jobs:
     - get: git-front-end
       trigger: true
       passed:
-        - deploy-to-development
+        - deploy-front-end-to-development
     - get: front-end-test-image
       passed:
         - build-front-end-test-image
@@ -289,7 +299,7 @@ jobs:
           yarn install
           npm test
 
-- name: deploy-to-loadtest
+- name: deploy-front-end-to-loadtest
   serial: true
   public: true
   plan:
@@ -297,23 +307,23 @@ jobs:
     - get: git-front-end
       trigger: true
       passed:
-        - execute-functional-tests
+        - execute-front-end-functional-tests
   - put: pcf-loadtest
     params:
       manifest: git-front-end/manifest.yml 
 
-- name: execute-load-tests
+- name: execute-front-end-load-tests
   serial: true
   public: true
   plan:
   - aggregate:
     - get: git-front-end
-      #trigger: true
-      #passed:
-      #  - deploy-to-loadtest
+      trigger: true
+      passed:
+        - deploy-front-end-to-loadtest
     - get: front-end-test-image
-      #passed:
-      #  - build-front-end-test-image
+      passed:
+        - build-front-end-test-image
   - task: run-load-tests
     image: front-end-test-image
     config:
@@ -329,7 +339,7 @@ jobs:
           yarn install
           bash test/e2e/runner.sh
 
-- name: deploy-to-production
+- name: deploy-front-end-to-production
   serial: true
   public: true
   plan:
@@ -337,7 +347,7 @@ jobs:
     - get: git-front-end
       trigger: true
       passed:
-        - execute-load-tests
+        - execute-front-end-load-tests
   - put: pcf-production
     params:
       manifest: git-front-end/manifest.yml 
@@ -350,7 +360,7 @@ jobs:
     - get: git-front-end
       trigger: true
       passed:
-        - deploy-to-production
+        - deploy-front-end-to-production
   - task: run-functional-tests
     config:
       platform: linux
@@ -391,6 +401,17 @@ jobs:
       build: workspace
       cache_tag: latest
 
+- name: build-user-test-image
+  serial: true
+  public: true
+  plan:
+  - get: git-user
+    trigger: false
+  - put: user-test-image
+    params:
+      build: git-user
+      cache_tag: latest
+
 - name: deploy-user-to-development
   serial: true
   public: true
@@ -402,6 +423,32 @@ jobs:
   - put: pcf-production
     params:
       manifest: git-user/manifest.yml
+  
+- name: execute-user-functional-tests
+  serial: true
+  public: true
+  plan:
+  - aggregate:
+    - get: git-user
+      trigger: true
+      passed:
+        - deploy-user-to-development
+    - get: user-test-image
+      passed:
+        - build-user-test-image
+  - task: run-functional-tests
+    image: user-test-image
+    config:
+      platform: linux
+      inputs:
+      - name: git-user
+      run:
+        dir: git-user
+        path: /bin/sh
+        args:
+        - -c
+        - |
+          go test api/endpoints_test.go
 
 # CATALOGUE
 

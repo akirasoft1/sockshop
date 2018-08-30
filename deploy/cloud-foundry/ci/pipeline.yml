@@ -17,6 +17,8 @@ groups:
   - build-user-test-image
   - deploy-user-to-development
   - execute-user-functional-tests
+  - deploy-user-to-loadtest
+  - execute-user-load-tests
 
 - name: catalogue-jobs
   jobs:
@@ -173,7 +175,7 @@ resources:
     repository: jbraeuer/shipping
     email: ((docker-hub-email))
     username: ((docker-hub-username))
-    password: X((docker-hub-password))
+    password: ((docker-hub-password))
 
 - name: queue-master-image
   type: docker-image
@@ -449,6 +451,45 @@ jobs:
         - -c
         - |
           go test api/endpoints_test.go
+
+- name: deploy-user-to-loadtest
+  serial: true
+  public: true
+  plan:
+  - aggregate:
+    - get: git-user
+      trigger: true
+      passed:
+        - execute-user-functional-tests
+  - put: pcf-loadtest
+    params:
+      manifest: git-user/manifest.yml 
+
+- name: execute-user-load-tests
+  serial: true
+  public: true
+  plan:
+  - aggregate:
+    - get: git-user
+      trigger: true
+      passed:
+        - deploy-user-to-loadtest
+    - get: user-test-image
+      passed:
+        - build-user-test-image
+  - task: run-load-tests
+    image: user-test-image
+    config:
+      platform: linux
+      inputs:
+      - name: git-user
+      run:
+        dir: git-user
+        path: /bin/bash
+        args:
+        - -exc
+        - |
+          jmeter -n -t test/load/loadtest_user.jmx
 
 # CATALOGUE
 
